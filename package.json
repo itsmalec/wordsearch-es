@@ -1,0 +1,17 @@
+{
+  "name": "sopa-de-letras",
+  "version": "1.0.0",
+  "description": "Spanish word search webapp, packaged for Android via Capacitor",
+  "private": true,
+  "scripts": {
+    "sync": "npx cap sync android",
+    "android": "npx cap open android"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/core": "^6.0.0"
+  }
+}

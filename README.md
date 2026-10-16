@@ -20,4 +20,15 @@ Animales, Colores, Comida, Familia, Países, Capitales. The last two are linked:
 
 ## Project structure
 
-Everything lives in one file, `index.html` (inline CSS and JS), by design — see [CONTEXT.md](./CONTEXT.md) for the domain vocabulary used throughout.
+The game itself lives in one file, `index.html` (inline CSS and JS), by design — see [CONTEXT.md](./CONTEXT.md) for the domain vocabulary used throughout. `www/index.html` is a symlink to that same file (Capacitor's required web asset folder), so there's only ever one copy to edit.
+
+## Android build (via Capacitor)
+
+Requires Node.js, plus Android Studio / the Android SDK, on your own machine — this isn't built from inside the chat session.
+
+```bash
+npm install
+npx cap add android   # one-time: generates the native android/ project
+npm run sync           # re-run after any change to index.html
+npm run android        # opens the project in Android Studio to build/run
+```
