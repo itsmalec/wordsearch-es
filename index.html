@@ -367,7 +367,11 @@
     hintInterval:null,
     selecting:false,
     startCell:null,
-    pathCells:[]
+    pathCells:[],
+    cellEls:null,
+    gridRect:null,
+    rafPending:false,
+    lastPointer:null
   };
 
   var screenHome = document.getElementById('screen-home');
@@ -437,7 +441,9 @@
 
   function renderGrid(){
     gridEl.innerHTML = '';
+    state.cellEls = [];
     for(var r=0;r<GRID_SIZE;r++){
+      var rowEls = [];
       for(var c=0;c<GRID_SIZE;c++){
         var cell = document.createElement('div');
         cell.className = 'cell';
@@ -445,7 +451,9 @@
         cell.dataset.c = c;
         cell.textContent = state.grid[r][c];
         gridEl.appendChild(cell);
+        rowEls.push(cell);
       }
+      state.cellEls.push(rowEls);
     }
   }
 
@@ -462,19 +470,22 @@
   }
 
   function cellEl(r,c){
-    return gridEl.querySelector('.cell[data-r="'+r+'"][data-c="'+c+'"]');
+    return state.cellEls[r][c];
   }
 
-  function clearSelectingClass(){
-    var els = gridEl.querySelectorAll('.cell.selecting');
-    els.forEach(function(el){ el.classList.remove('selecting'); });
+  function setPathClass(cells, className, on){
+    cells.forEach(function(rc){
+      var el = cellEl(rc[0], rc[1]);
+      if(el) el.classList.toggle(className, on);
+    });
   }
 
   function highlightPath(cells, className){
-    cells.forEach(function(rc){
-      var el = cellEl(rc[0], rc[1]);
-      if(el) el.classList.add(className);
-    });
+    setPathClass(cells, className, true);
+  }
+
+  function sameEndCell(a, b){
+    return a && b && a[0]===b[0] && a[1]===b[1];
   }
 
   function buildStraightPath(startCell, endCell){
@@ -497,39 +508,62 @@
     return cells.map(function(rc){ return state.grid[rc[0]][rc[1]]; }).join('');
   }
 
-  function cellFromPoint(clientX, clientY){
-    var el = document.elementFromPoint(clientX, clientY);
-    if(!el) return null;
-    var cellNode = el.closest('.cell');
-    if(!cellNode) return null;
-    return [parseInt(cellNode.dataset.r,10), parseInt(cellNode.dataset.c,10)];
+  function cellFromCoords(clientX, clientY){
+    var rect = state.gridRect;
+    if(!rect) return null;
+    var x = clientX - rect.left, y = clientY - rect.top;
+    if(x<0 || y<0 || x>=rect.width || y>=rect.height) return null;
+    var col = Math.floor((x / rect.width) * GRID_SIZE);
+    var row = Math.floor((y / rect.height) * GRID_SIZE);
+    row = Math.max(0, Math.min(GRID_SIZE-1, row));
+    col = Math.max(0, Math.min(GRID_SIZE-1, col));
+    return [row, col];
+  }
+
+  function updateSelectionPath(newPath){
+    setPathClass(state.pathCells, 'selecting', false);
+    setPathClass(newPath, 'selecting', true);
+    state.pathCells = newPath;
+  }
+
+  function processPendingMove(){
+    state.rafPending = false;
+    if(!state.selecting || !state.lastPointer) return;
+    var rc = cellFromCoords(state.lastPointer.x, state.lastPointer.y);
+    if(!rc) return;
+    var currentEnd = state.pathCells[state.pathCells.length-1];
+    if(sameEndCell(rc, currentEnd)) return;
+    var path = buildStraightPath(state.startCell, rc);
+    if(!path) return;
+    updateSelectionPath(path);
   }
 
   gridEl.addEventListener('pointerdown', function(e){
-    var rc = cellFromPoint(e.clientX, e.clientY);
+    var rect = gridEl.getBoundingClientRect();
+    state.gridRect = rect;
+    var rc = cellFromCoords(e.clientX, e.clientY);
     if(!rc) return;
+    e.preventDefault();
     state.selecting = true;
     state.startCell = rc;
-    state.pathCells = [rc];
-    clearSelectingClass();
-    highlightPath(state.pathCells, 'selecting');
+    state.pathCells = [];
+    updateSelectionPath([rc]);
   });
 
   window.addEventListener('pointermove', function(e){
     if(!state.selecting) return;
-    var rc = cellFromPoint(e.clientX, e.clientY);
-    if(!rc) return;
-    var path = buildStraightPath(state.startCell, rc);
-    if(!path) return;
-    clearSelectingClass();
-    state.pathCells = path;
-    highlightPath(path, 'selecting');
-  });
+    e.preventDefault();
+    state.lastPointer = {x:e.clientX, y:e.clientY};
+    if(!state.rafPending){
+      state.rafPending = true;
+      requestAnimationFrame(processPendingMove);
+    }
+  }, {passive:false});
 
   window.addEventListener('pointerup', function(){
     if(!state.selecting) return;
     state.selecting = false;
-    clearSelectingClass();
+    setPathClass(state.pathCells, 'selecting', false);
     finalizeSelection();
   });
 
