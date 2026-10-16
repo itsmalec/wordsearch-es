@@ -1,1 +1,644 @@
-../index.html
+<title>Sopa de Letras</title>
+<style>
+  :root{
+    --bg:#faf6ef;
+    --surface:#ffffff;
+    --text:#2b2320;
+    --muted:#8a7f74;
+    --border:#e7ddd0;
+    --accent:#e0604f;
+    --accent-ink:#ffffff;
+    --accent2:#2a9d8f;
+    --found-bg:#d8f0ea;
+    --found-text:#1f6e62;
+    --selecting:#ffe3b0;
+    --shadow:0 4px 16px rgba(60,40,20,0.08);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1b1713;
+      --surface:#27221d;
+      --text:#f3ece2;
+      --muted:#a99c8c;
+      --border:#3a332b;
+      --accent:#e9765f;
+      --accent-ink:#1b1713;
+      --accent2:#45b4a4;
+      --found-bg:#1f3a35;
+      --found-text:#8be0cf;
+      --selecting:#5a4420;
+      --shadow:0 4px 16px rgba(0,0,0,0.4);
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    min-height:100vh;
+  }
+  #app{max-width:900px;margin:0 auto;padding:24px 16px 80px;}
+  header{text-align:center;margin-bottom:24px;}
+  header h1{font-size:1.8rem;margin:0 0 4px;}
+  header p{color:var(--muted);margin:0;font-size:0.95rem;}
+  .screen[hidden]{display:none;}
+
+  /* Home screen */
+  #category-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:16px;
+  }
+  .category-card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:20px;
+    text-align:center;
+    cursor:pointer;
+    box-shadow:var(--shadow);
+    transition:transform .15s ease;
+  }
+  .category-card:hover{transform:translateY(-3px);}
+  .category-card .emoji{font-size:2.4rem;display:block;margin-bottom:8px;}
+  .category-card .name{font-weight:600;font-size:1.1rem;}
+  .category-card .best{color:var(--muted);font-size:0.85rem;margin-top:6px;}
+
+  /* Game screen */
+  .game-topbar{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
+  .back-btn{
+    background:var(--surface);border:1px solid var(--border);border-radius:10px;
+    padding:8px 14px;cursor:pointer;font-size:0.95rem;color:var(--text);
+  }
+  .game-topbar h2{margin:0;font-size:1.3rem;flex:1;}
+
+  .game-layout{display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;}
+
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(12,1fr);
+    gap:2px;
+    background:var(--border);
+    border:1px solid var(--border);
+    border-radius:12px;
+    overflow:hidden;
+    touch-action:none;
+    user-select:none;
+    width:min(100%,480px);
+    aspect-ratio:1/1;
+    flex:1 1 380px;
+  }
+  .cell{
+    background:var(--surface);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:600;
+    font-size:clamp(0.65rem,2.6vw,1rem);
+    color:var(--text);
+    touch-action:none;
+    user-select:none;
+  }
+  .cell.selecting{background:var(--selecting);}
+  .cell.found{background:var(--found-bg);color:var(--found-text);}
+  .cell.hint{background:var(--accent);color:var(--accent-ink);}
+
+  .word-panel{flex:1 1 200px;min-width:180px;}
+  .word-panel h3{margin:0 0 10px;font-size:1rem;color:var(--muted);}
+  #word-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
+  #word-list li{
+    background:var(--surface);border:1px solid var(--border);border-radius:10px;
+    padding:8px 12px;font-size:0.95rem;cursor:default;
+  }
+  #word-list li.found{
+    background:var(--found-bg);color:var(--found-text);
+    text-decoration:line-through;
+  }
+
+  /* Definition toast */
+  .toast{
+    position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+    background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow);
+    border-radius:14px;padding:14px 20px;max-width:90vw;text-align:center;z-index:50;
+  }
+  .toast[hidden]{display:none;}
+  .toast .tw{font-weight:700;font-size:1.05rem;}
+  .toast .td{color:var(--muted);margin-top:4px;font-size:0.9rem;}
+
+  /* Win overlay */
+  .overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,0.45);
+    display:flex;align-items:center;justify-content:center;z-index:60;padding:16px;
+  }
+  .overlay[hidden]{display:none;}
+  .win-card{
+    background:var(--surface);border-radius:18px;padding:28px 24px;max-width:360px;
+    text-align:center;box-shadow:var(--shadow);
+  }
+  .win-card h2{margin:0 0 8px;}
+  .win-card .time{font-size:1.4rem;font-weight:700;color:var(--accent2);margin:8px 0;}
+  .win-card .compare{color:var(--muted);font-size:0.9rem;margin-bottom:18px;}
+  .win-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+  .btn{
+    border:none;border-radius:10px;padding:10px 16px;font-size:0.95rem;cursor:pointer;
+  }
+  .btn-primary{background:var(--accent);color:var(--accent-ink);}
+  .btn-secondary{background:var(--surface);border:1px solid var(--border);color:var(--text);}
+
+  #confetti-layer{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:70;}
+  .confetti-piece{
+    position:absolute;top:-10px;width:8px;height:14px;opacity:0.9;
+    animation-name:confetti-fall;animation-timing-function:ease-in;
+    animation-fill-mode:forwards;
+  }
+  @keyframes confetti-fall{
+    to{transform:translateY(110vh) rotate(540deg);opacity:0.3;}
+  }
+</style>
+
+<div id="app">
+  <header>
+    <h1>🔎 Sopa de Letras</h1>
+    <p>Elige una categoría y encuentra las 8 palabras escondidas.</p>
+  </header>
+
+  <main id="screen-home" class="screen">
+    <div id="category-grid"></div>
+  </main>
+
+  <main id="screen-game" class="screen" hidden>
+    <div class="game-topbar">
+      <button class="back-btn" id="back-btn">⟵ Volver</button>
+      <h2 id="game-title"></h2>
+    </div>
+    <div class="game-layout">
+      <div class="grid" id="grid"></div>
+      <div class="word-panel">
+        <h3>Palabras</h3>
+        <ul id="word-list"></ul>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="definition-toast" hidden>
+  <div class="tw" id="toast-word"></div>
+  <div class="td" id="toast-def"></div>
+</div>
+
+<div class="overlay" id="win-overlay" hidden>
+  <div class="win-card">
+    <h2>¡Completaste la categoría! 🎉</h2>
+    <div class="time" id="win-time"></div>
+    <div class="compare" id="win-compare"></div>
+    <div class="win-actions">
+      <button class="btn btn-primary" id="win-replay">Jugar de nuevo</button>
+      <button class="btn btn-secondary" id="win-home">Volver al menú</button>
+    </div>
+  </div>
+</div>
+
+<div id="confetti-layer"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var GRID_SIZE = 12;
+  var DIRS = [[0,1],[1,0],[1,1],[1,-1]]; // right, down, down-right, down-left
+  var HINT_DELAY_MS = 5*60*1000;
+
+  var CATEGORIES = {
+    animales: {name:'Animales', emoji:'🐾', words:[
+      {w:'Perro', d:'Mamífero doméstico, leal compañero del ser humano.'},
+      {w:'Gato', d:'Mamífero doméstico pequeño, ágil e independiente.'},
+      {w:'Caballo', d:'Mamífero grande usado para montar o tirar carga.'},
+      {w:'Elefante', d:'El mamífero terrestre más grande, con una trompa larga.'},
+      {w:'Tigre', d:'Felino grande de rayas negras y naranjas.'},
+      {w:'León', d:'Felino grande conocido como el rey de la selva.'},
+      {w:'Conejo', d:'Mamífero pequeño de orejas largas y cola corta.'},
+      {w:'Ratón', d:'Roedor pequeño y de cola larga.'}
+    ]},
+    colores: {name:'Colores', emoji:'🎨', words:[
+      {w:'Rojo', d:'Color de la sangre y del fuego.'},
+      {w:'Azul', d:'Color del cielo despejado y del mar.'},
+      {w:'Verde', d:'Color de las hojas y la hierba.'},
+      {w:'Amarillo', d:'Color del sol y de los limones.'},
+      {w:'Naranja', d:'Color de la fruta del mismo nombre.'},
+      {w:'Morado', d:'Color que resulta de mezclar azul y rojo.'},
+      {w:'Blanco', d:'Color de la nieve, ausencia de color.'},
+      {w:'Negro', d:'El color más oscuro, ausencia de luz.'}
+    ]},
+    comida: {name:'Comida', emoji:'🍎', words:[
+      {w:'Manzana', d:'Fruta roja o verde, crujiente y dulce.'},
+      {w:'Pan', d:'Alimento hecho de harina horneada, básico en la dieta.'},
+      {w:'Queso', d:'Alimento sólido hecho de leche cuajada.'},
+      {w:'Arroz', d:'Grano blanco, alimento básico en muchas culturas.'},
+      {w:'Pollo', d:'Carne de ave, una de las más consumidas del mundo.'},
+      {w:'Pescado', d:'Carne de animales acuáticos como la trucha o el salmón.'},
+      {w:'Huevo', d:'Alimento ovalado que ponen las aves, rico en proteína.'},
+      {w:'Leche', d:'Líquido blanco que producen los mamíferos para alimentar a sus crías.'}
+    ]},
+    familia: {name:'Familia', emoji:'👪', words:[
+      {w:'Madre', d:'Mujer que ha tenido uno o más hijos.'},
+      {w:'Padre', d:'Hombre que ha tenido uno o más hijos.'},
+      {w:'Hermano', d:'Varón que comparte los mismos padres que otra persona.'},
+      {w:'Hermana', d:'Mujer que comparte los mismos padres que otra persona.'},
+      {w:'Abuelo', d:'Padre del padre o de la madre.'},
+      {w:'Abuela', d:'Madre del padre o de la madre.'},
+      {w:'Tío', d:'Hermano del padre o de la madre.'},
+      {w:'Tía', d:'Hermana del padre o de la madre.'}
+    ]},
+    paises: {name:'Países', emoji:'🌎', words:[
+      {w:'Argentina', d:'Capital: Buenos Aires'},
+      {w:'Perú', d:'Capital: Lima'},
+      {w:'Chile', d:'Capital: Santiago'},
+      {w:'España', d:'Capital: Madrid'},
+      {w:'Colombia', d:'Capital: Bogotá'},
+      {w:'Ecuador', d:'Capital: Quito'},
+      {w:'Uruguay', d:'Capital: Montevideo'},
+      {w:'Venezuela', d:'Capital: Caracas'}
+    ]},
+    capitales: {name:'Capitales', emoji:'🏛️', words:[
+      {w:'Buenos Aires', d:'País: Argentina'},
+      {w:'Lima', d:'País: Perú'},
+      {w:'Santiago', d:'País: Chile'},
+      {w:'Madrid', d:'País: España'},
+      {w:'Bogotá', d:'País: Colombia'},
+      {w:'Quito', d:'País: Ecuador'},
+      {w:'Montevideo', d:'País: Uruguay'},
+      {w:'Caracas', d:'País: Venezuela'}
+    ]}
+  };
+
+  var ACCENT_MAP = {'Á':'A','É':'E','Í':'I','Ó':'O','Ú':'U','á':'a','é':'e','í':'i','ó':'o','ú':'u'};
+  function normalizeWord(s){
+    var out = '';
+    for(var i=0;i<s.length;i++){
+      var ch = s[i];
+      out += ACCENT_MAP[ch] || ch;
+    }
+    return out.toUpperCase().replace(/\s+/g,'');
+  }
+
+  function formatTime(ms){
+    var totalSeconds = Math.floor(ms/1000);
+    var m = Math.floor(totalSeconds/60);
+    var s = totalSeconds%60;
+    return m + ':' + (s<10 ? '0'+s : s);
+  }
+
+  function bestKey(catKey){ return 'wordsearch-es:best:' + catKey; }
+  function loadBest(catKey){
+    var v = localStorage.getItem(bestKey(catKey));
+    return v ? parseInt(v,10) : null;
+  }
+  function saveBest(catKey, ms){
+    localStorage.setItem(bestKey(catKey), String(ms));
+  }
+
+  // ---- Grid generation ----
+  function tryPlaceWord(grid, size, letters){
+    var attempts = 300;
+    for(var a=0;a<attempts;a++){
+      var dir = DIRS[Math.floor(Math.random()*DIRS.length)];
+      var dr = dir[0], dc = dir[1];
+      var len = letters.length;
+      var rMin=0, rMax=size-1, cMin=0, cMax=size-1;
+      if(dr===1) rMax = size-len;
+      if(dc===1) cMax = size-len;
+      if(dc===-1) cMin = len-1;
+      if(rMax<rMin || cMax<cMin) continue;
+      var r0 = Math.floor(Math.random()*(rMax-rMin+1))+rMin;
+      var c0 = Math.floor(Math.random()*(cMax-cMin+1))+cMin;
+      var ok = true;
+      var cells = [];
+      for(var i=0;i<len;i++){
+        var r = r0+dr*i, c = c0+dc*i;
+        var existing = grid[r][c];
+        if(existing!==null && existing!==letters[i]){ ok=false; break; }
+        cells.push([r,c]);
+      }
+      if(!ok) continue;
+      for(var j=0;j<cells.length;j++){
+        grid[cells[j][0]][cells[j][1]] = letters[j];
+      }
+      return cells;
+    }
+    return null;
+  }
+
+  function generateGrid(size, wordList){
+    var pool = 'AAAABBCCDDEEEEFFGGHHIIIJKLLMMNNNÑOOOOPPQRRSSSTTTUUVVWXYYZ';
+    for(var attempt=0; attempt<60; attempt++){
+      var grid = [];
+      for(var r=0;r<size;r++){ grid.push(new Array(size).fill(null)); }
+      var placements = {};
+      var sorted = wordList.slice().sort(function(a,b){ return b.length-a.length; });
+      var success = true;
+      for(var i=0;i<sorted.length;i++){
+        var norm = sorted[i];
+        var cells = tryPlaceWord(grid, size, norm.split(''));
+        if(!cells){ success=false; break; }
+        placements[norm] = cells;
+      }
+      if(success){
+        for(var rr=0; rr<size; rr++){
+          for(var cc=0; cc<size; cc++){
+            if(grid[rr][cc]===null){
+              grid[rr][cc] = pool[Math.floor(Math.random()*pool.length)];
+            }
+          }
+        }
+        return {grid:grid, placements:placements};
+      }
+    }
+    throw new Error('No se pudo generar la cuadrícula');
+  }
+
+  // ---- State ----
+  var state = {
+    catKey:null,
+    wordsByNorm:null,
+    grid:null,
+    placements:null,
+    found:null,
+    startTime:0,
+    lastProgressAt:0,
+    hintInterval:null,
+    selecting:false,
+    startCell:null,
+    pathCells:[]
+  };
+
+  var screenHome = document.getElementById('screen-home');
+  var screenGame = document.getElementById('screen-game');
+  var categoryGridEl = document.getElementById('category-grid');
+  var gridEl = document.getElementById('grid');
+  var wordListEl = document.getElementById('word-list');
+  var gameTitleEl = document.getElementById('game-title');
+  var toastEl = document.getElementById('definition-toast');
+  var toastWordEl = document.getElementById('toast-word');
+  var toastDefEl = document.getElementById('toast-def');
+  var winOverlay = document.getElementById('win-overlay');
+  var winTimeEl = document.getElementById('win-time');
+  var winCompareEl = document.getElementById('win-compare');
+
+  var toastTimer = null;
+
+  function renderHome(){
+    categoryGridEl.innerHTML = '';
+    Object.keys(CATEGORIES).forEach(function(key){
+      var cat = CATEGORIES[key];
+      var best = loadBest(key);
+      var card = document.createElement('div');
+      card.className = 'category-card';
+      card.innerHTML =
+        '<span class="emoji">'+cat.emoji+'</span>' +
+        '<div class="name">'+cat.name+'</div>' +
+        '<div class="best">'+(best ? 'Mejor tiempo: '+formatTime(best) : 'Sin récord aún')+'</div>';
+      card.addEventListener('click', function(){ startCategory(key); });
+      categoryGridEl.appendChild(card);
+    });
+  }
+
+  function startCategory(key){
+    var cat = CATEGORIES[key];
+    var wordsByNorm = {};
+    var normList = [];
+    cat.words.forEach(function(entry){
+      var norm = normalizeWord(entry.w);
+      wordsByNorm[norm] = entry;
+      normList.push(norm);
+    });
+
+    var built = generateGrid(GRID_SIZE, normList);
+
+    state.catKey = key;
+    state.wordsByNorm = wordsByNorm;
+    state.grid = built.grid;
+    state.placements = built.placements;
+    state.found = new Set();
+    state.startTime = Date.now();
+    state.lastProgressAt = state.startTime;
+    state.selecting = false;
+    state.startCell = null;
+    state.pathCells = [];
+
+    gameTitleEl.textContent = cat.emoji + ' ' + cat.name;
+    renderGrid();
+    renderWordList();
+
+    screenHome.hidden = true;
+    screenGame.hidden = false;
+
+    if(state.hintInterval) clearInterval(state.hintInterval);
+    state.hintInterval = setInterval(checkHint, 2000);
+  }
+
+  function renderGrid(){
+    gridEl.innerHTML = '';
+    for(var r=0;r<GRID_SIZE;r++){
+      for(var c=0;c<GRID_SIZE;c++){
+        var cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.dataset.r = r;
+        cell.dataset.c = c;
+        cell.textContent = state.grid[r][c];
+        gridEl.appendChild(cell);
+      }
+    }
+  }
+
+  function renderWordList(){
+    wordListEl.innerHTML = '';
+    Object.keys(state.wordsByNorm).forEach(function(norm){
+      var entry = state.wordsByNorm[norm];
+      var li = document.createElement('li');
+      li.textContent = entry.w;
+      li.dataset.norm = norm;
+      if(state.found.has(norm)) li.classList.add('found');
+      wordListEl.appendChild(li);
+    });
+  }
+
+  function cellEl(r,c){
+    return gridEl.querySelector('.cell[data-r="'+r+'"][data-c="'+c+'"]');
+  }
+
+  function clearSelectingClass(){
+    var els = gridEl.querySelectorAll('.cell.selecting');
+    els.forEach(function(el){ el.classList.remove('selecting'); });
+  }
+
+  function highlightPath(cells, className){
+    cells.forEach(function(rc){
+      var el = cellEl(rc[0], rc[1]);
+      if(el) el.classList.add(className);
+    });
+  }
+
+  function buildStraightPath(startCell, endCell){
+    var dR = endCell[0]-startCell[0];
+    var dC = endCell[1]-startCell[1];
+    if(dR===0 && dC===0) return [startCell];
+    var isStraight = (dR===0) || (dC===0) || (Math.abs(dR)===Math.abs(dC));
+    if(!isStraight) return null;
+    var steps = Math.max(Math.abs(dR), Math.abs(dC));
+    var stepR = dR===0 ? 0 : dR/Math.abs(dR);
+    var stepC = dC===0 ? 0 : dC/Math.abs(dC);
+    var path = [];
+    for(var i=0;i<=steps;i++){
+      path.push([startCell[0]+stepR*i, startCell[1]+stepC*i]);
+    }
+    return path;
+  }
+
+  function pathLetters(cells){
+    return cells.map(function(rc){ return state.grid[rc[0]][rc[1]]; }).join('');
+  }
+
+  function cellFromPoint(clientX, clientY){
+    var el = document.elementFromPoint(clientX, clientY);
+    if(!el) return null;
+    var cellNode = el.closest('.cell');
+    if(!cellNode) return null;
+    return [parseInt(cellNode.dataset.r,10), parseInt(cellNode.dataset.c,10)];
+  }
+
+  gridEl.addEventListener('pointerdown', function(e){
+    var rc = cellFromPoint(e.clientX, e.clientY);
+    if(!rc) return;
+    state.selecting = true;
+    state.startCell = rc;
+    state.pathCells = [rc];
+    clearSelectingClass();
+    highlightPath(state.pathCells, 'selecting');
+  });
+
+  window.addEventListener('pointermove', function(e){
+    if(!state.selecting) return;
+    var rc = cellFromPoint(e.clientX, e.clientY);
+    if(!rc) return;
+    var path = buildStraightPath(state.startCell, rc);
+    if(!path) return;
+    clearSelectingClass();
+    state.pathCells = path;
+    highlightPath(path, 'selecting');
+  });
+
+  window.addEventListener('pointerup', function(){
+    if(!state.selecting) return;
+    state.selecting = false;
+    clearSelectingClass();
+    finalizeSelection();
+  });
+
+  function finalizeSelection(){
+    if(state.pathCells.length < 2){ state.pathCells = []; return; }
+    var letters = pathLetters(state.pathCells);
+    var reversed = letters.split('').reverse().join('');
+    var matchedNorm = null;
+    Object.keys(state.wordsByNorm).forEach(function(norm){
+      if(state.found.has(norm)) return;
+      if(norm===letters || norm===reversed) matchedNorm = norm;
+    });
+    if(matchedNorm){
+      markFound(matchedNorm, state.pathCells);
+    }
+    state.pathCells = [];
+  }
+
+  function markFound(norm, cells){
+    state.found.add(norm);
+    state.lastProgressAt = Date.now();
+    highlightPath(cells, 'found');
+    var li = wordListEl.querySelector('li[data-norm="'+norm+'"]');
+    if(li) li.classList.add('found');
+
+    var entry = state.wordsByNorm[norm];
+    showToast(entry.w, entry.d);
+
+    if(state.found.size === Object.keys(state.wordsByNorm).length){
+      handleWin();
+    }
+  }
+
+  function showToast(word, def){
+    toastWordEl.textContent = word;
+    toastDefEl.textContent = def;
+    toastEl.hidden = false;
+    if(toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toastEl.hidden = true; }, 2500);
+  }
+
+  function checkHint(){
+    if(Date.now() - state.lastProgressAt < HINT_DELAY_MS) return;
+    var unfound = Object.keys(state.wordsByNorm).filter(function(n){ return !state.found.has(n); });
+    if(unfound.length===0) return;
+    var pick = unfound[Math.floor(Math.random()*unfound.length)];
+    var cells = state.placements[pick];
+    highlightPath(cells, 'hint');
+    setTimeout(function(){
+      cells.forEach(function(rc){
+        var el = cellEl(rc[0], rc[1]);
+        if(el) el.classList.remove('hint');
+      });
+    }, 1000);
+    state.lastProgressAt = Date.now();
+  }
+
+  function handleWin(){
+    clearInterval(state.hintInterval);
+    var elapsed = Date.now() - state.startTime;
+    var best = loadBest(state.catKey);
+    var isNew = !best || elapsed < best;
+    if(isNew) saveBest(state.catKey, elapsed);
+
+    winTimeEl.textContent = 'Tiempo: ' + formatTime(elapsed);
+    if(isNew){
+      winCompareEl.textContent = '¡Nuevo mejor tiempo! 🎉';
+    } else {
+      winCompareEl.textContent = 'Tu mejor tiempo sigue siendo ' + formatTime(best) +
+        ' (' + formatTime(elapsed-best) + ' más esta vez)';
+    }
+    winOverlay.hidden = false;
+    burstConfetti();
+  }
+
+  function burstConfetti(){
+    var layer = document.getElementById('confetti-layer');
+    var colors = ['#e0604f','#2a9d8f','#f4a259','#8ac4d0','#e9c46a'];
+    for(var i=0;i<80;i++){
+      var piece = document.createElement('div');
+      piece.className = 'confetti-piece';
+      piece.style.left = Math.random()*100 + 'vw';
+      piece.style.background = colors[Math.floor(Math.random()*colors.length)];
+      piece.style.animationDuration = (2+Math.random()*1.5) + 's';
+      piece.style.animationDelay = (Math.random()*0.4) + 's';
+      layer.appendChild(piece);
+      (function(p){
+        setTimeout(function(){ p.remove(); }, 4000);
+      })(piece);
+    }
+  }
+
+  document.getElementById('back-btn').addEventListener('click', goHome);
+  document.getElementById('win-home').addEventListener('click', function(){
+    winOverlay.hidden = true;
+    goHome();
+  });
+  document.getElementById('win-replay').addEventListener('click', function(){
+    winOverlay.hidden = true;
+    startCategory(state.catKey);
+  });
+
+  function goHome(){
+    if(state.hintInterval) clearInterval(state.hintInterval);
+    screenGame.hidden = true;
+    screenHome.hidden = false;
+    renderHome();
+  }
+
+  renderHome();
+})();
+</script>

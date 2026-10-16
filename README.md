@@ -20,7 +20,7 @@ Animales, Colores, Comida, Familia, Países, Capitales. The last two are linked:
 
 ## Project structure
 
-The game itself lives in one file, `index.html` (inline CSS and JS), by design — see [CONTEXT.md](./CONTEXT.md) for the domain vocabulary used throughout. `www/index.html` is a symlink to that same file (Capacitor's required web asset folder), so there's only ever one copy to edit.
+The game itself lives in one file, `index.html` (inline CSS and JS), by design — see [CONTEXT.md](./CONTEXT.md) for the domain vocabulary used throughout. `www/index.html` is a copy of that file (Capacitor's required web asset folder) kept in sync by `npm run copy-www`; always edit the root `index.html`, never `www/index.html` directly.
 
 ## Android build (via Capacitor)
 
@@ -29,6 +29,7 @@ Requires Node.js, plus Android Studio / the Android SDK, on your own machine —
 ```bash
 npm install
 npx cap add android   # one-time: generates the native android/ project
-npm run sync           # re-run after any change to index.html
-npm run android        # opens the project in Android Studio to build/run
+npm run android        # copies the latest index.html into www/, syncs, then opens Android Studio
 ```
+
+Just re-run `npm run android` (or `npm run sync`) after any change to `index.html` — both always copy the latest version into `www/` first, so the app in Android Studio never goes stale.

@@ -4,8 +4,9 @@
   "description": "Spanish word search webapp, packaged for Android via Capacitor",
   "private": true,
   "scripts": {
-    "sync": "npx cap sync android",
-    "android": "npx cap open android"
+    "copy-www": "cp index.html www/index.html",
+    "sync": "npm run copy-www && npx cap sync android",
+    "android": "npm run sync && npx cap open android"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.0.0"
